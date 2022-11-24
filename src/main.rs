@@ -42,11 +42,13 @@ async fn root() -> Html<&'static str> {
     Html("<h2>Hello from bors 🤖<h2>")
 }
 
-async fn health() -> Html<String> {
-    Html("<h4>OK ✅</h4>".to_string())
+async fn health() -> Html<&'static str> {
+    Html("<h4>OK ✅</h4>")
 }
 
-async fn handle_payload(req: Request<Body>) -> Result<impl IntoResponse, (StatusCode, String)> {
+async fn handle_payload(
+    req: Request<Body>,
+) -> Result<impl IntoResponse, (StatusCode, &'static str)> {
     tracing::info!("request = {:?}", req);
     let (head, body) = req.into_parts();
 
@@ -55,7 +57,7 @@ async fn handle_payload(req: Request<Body>) -> Result<impl IntoResponse, (Status
         None => {
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "X-GitHub-Event header not set".to_owned(),
+                "X-GitHub-Event header not set",
             ));
         }
     };
