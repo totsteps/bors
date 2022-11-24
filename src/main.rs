@@ -26,12 +26,16 @@ async fn main() {
         .route("/webhook", post(handle_payload))
         .layer(TraceLayer::new_for_http());
 
-    let addr = "[::]:8080".parse().unwrap();
+    let port = std::env::var("PORT")
+        .ok()
+        .map(|p| p.parse::<u16>())
+        .expect("Unable to parse PORT")
+        .unwrap_or(8080);
+    let addr = ([0, 0, 0, 0], port).into();
     tracing::info!("Listening on http://{addr}");
-    Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    if let Err(e) = Server::bind(&addr).serve(app.into_make_service()).await {
+        eprintln!("Error running server: {:?}", e);
+    }
 }
 
 async fn root() -> Html<&'static str> {
