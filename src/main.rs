@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod payload;
+
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
@@ -39,7 +41,7 @@ async fn main() {
 }
 
 async fn root() -> Html<&'static str> {
-    Html("<h2>Hello from bors 🤖<h2>")
+    Html("<h2>Hello from bors 🤖</h2>")
 }
 
 async fn health() -> Html<&'static str> {
@@ -50,19 +52,29 @@ async fn handle_payload(
     req: Request<Body>,
 ) -> Result<impl IntoResponse, (StatusCode, &'static str)> {
     tracing::info!("request = {:?}", req);
-    let (head, body) = req.into_parts();
 
-    let _event = match head.headers.get("x-github-event") {
-        Some(e) => e,
+    let (head, body) = req.into_parts();
+    let payload = hyper::body::to_bytes(body).await.unwrap();
+
+    let signature = match head.headers.get("X-Hub-Signature-256") {
+        Some(sig) => sig.to_str().unwrap(),
         None => {
             return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "X-GitHub-Event header not set",
-            ));
+                StatusCode::BAD_REQUEST,
+                "X-Hub-Signature-256 header not set",
+            ))
         }
     };
 
-    let payload = hyper::body::to_bytes(body).await.unwrap();
+    if let Err(_) = payload::verify_payload(signature, &payload) {
+        return Err((StatusCode::UNAUTHORIZED, "Signature's do not match"));
+    }
+
+    let _event = match head.headers.get("X-GitHub-Event") {
+        Some(e) => e,
+        None => return Err((StatusCode::BAD_REQUEST, "X-GitHub-Event header not set")),
+    };
+
     let payload =
         serde_json::from_str::<IssueEvent>(std::str::from_utf8(&payload).unwrap()).unwrap();
 
