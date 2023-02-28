@@ -13,7 +13,7 @@ mod payload;
 
 #[tokio::main]
 async fn main() {
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(

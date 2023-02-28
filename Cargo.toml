@@ -10,15 +10,15 @@ description = "TBD"
 license = "TBD"
 
 [dependencies]
-axum = "0.6.0-rc.5"
-dotenv = "0.15.0"
+axum = "0.6.9"
+dotenvy = "0.15.6"
 hex = "0.4.3"
 hmac = "0.12.1"
-hyper = "0.14.23"
-serde = { version = "1.0.147", features = ["derive"] }
-serde_json = "1.0.89"
+hyper = "0.14.24"
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.93"
 sha2 = "0.10.6"
-tokio = { version = "1.21.2", features = ["full"] }
-tower-http = { version = "0.3.4", features = ["trace"] }
+tokio = { version = "1.25.0", features = ["full"] }
+tower-http = { version = "0.4.0", features = ["trace"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
