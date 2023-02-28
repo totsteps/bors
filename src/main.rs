@@ -1,7 +1,7 @@
 use axum::{
     body::Body,
     http::{Request, StatusCode},
-    response::{Html, IntoResponse},
+    response::Html,
     routing::{get, post},
     Json, Router, Server,
 };
@@ -30,9 +30,8 @@ async fn main() {
 
     let port = std::env::var("PORT")
         .ok()
-        .map(|p| p.parse::<u16>())
-        .expect("Unable to parse PORT")
-        .unwrap_or(8080);
+        .map(|p| p.parse::<u16>().expect("Unable to parse PORT"))
+        .unwrap_or(3000);
     let addr = ([0, 0, 0, 0], port).into();
     tracing::info!("Listening on http://{addr}");
     if let Err(e) = Server::bind(&addr).serve(app.into_make_service()).await {
@@ -50,10 +49,12 @@ async fn health() -> Html<&'static str> {
 
 async fn handle_payload(
     req: Request<Body>,
-) -> Result<impl IntoResponse, (StatusCode, &'static str)> {
-    tracing::info!("request = {:?}", req);
-
+) -> Result<Json<IssueEvent>, (StatusCode, &'static str)> {
     let (head, body) = req.into_parts();
+    // todo Wrap this with RequestBodyLimiter; limit is not applied when consuming body with Body::data
+    // See: https://github.com/tokio-rs/axum/pull/1346 and
+    // https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html
+    // perhaps extract signature headers before consuming body since we know remote is trusted?
     let payload = hyper::body::to_bytes(body).await.unwrap();
 
     let signature = match head.headers.get("X-Hub-Signature-256") {
@@ -66,14 +67,16 @@ async fn handle_payload(
         }
     };
 
-    if let Err(_) = payload::verify_payload(signature, &payload) {
-        return Err((StatusCode::UNAUTHORIZED, "Signature's do not match"));
-    }
+    // todo read this into a Context struct to easily share across app
+    let secret = std::env::var("GITHUB_WEBHOOK_SECRET").expect("GITHUB_WEBHOOK_SECRET not found");
 
-    let _event = match head.headers.get("X-GitHub-Event") {
-        Some(e) => e,
-        None => return Err((StatusCode::BAD_REQUEST, "X-GitHub-Event header not set")),
-    };
+    payload::verify_payload(&secret, signature, &payload)
+        .map_err(|_| (StatusCode::UNAUTHORIZED, "Signature's do not match"))?;
+
+    let _event = head
+        .headers
+        .get("X-GitHub-Event")
+        .ok_or((StatusCode::BAD_REQUEST, "X-GitHub-Event header not set"))?;
 
     let payload =
         serde_json::from_str::<IssueEvent>(std::str::from_utf8(&payload).unwrap()).unwrap();
